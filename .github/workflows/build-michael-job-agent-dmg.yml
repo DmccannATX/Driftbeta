@@ -1,8 +1,7 @@
-name: Build Michael Job Agent DMG
+name: Build Michael Job Agent DMG v1.0.1
 on:
   push:
     branches:
-      - main
       - build/michael-job-agent-dmg
 jobs:
   build-mac:
@@ -13,30 +12,69 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Reconstruct source
+      - name: Reconstruct reviewed source
         run: |
-          node -e "const fs=require('fs');fs.writeFileSync('/tmp/mja-source.zip',Buffer.from(fs.readFileSync('mja-public-source.b64','utf8'),'base64'))"
-          echo "2e89d920c437b8b81bf2e04673519f0ad34b6146b52b6ab5c34497bbf9859620  /tmp/mja-source.zip" | shasum -a 256 -c -
+          cat mja-v101.part00 mja-v101.part01 mja-v101.part02 mja-v101.part03 mja-v101.part04 mja-v101.part05 > /tmp/mja-source.b64
+          node -e "const fs=require('fs'); fs.writeFileSync('/tmp/mja-source.zip', Buffer.from(fs.readFileSync('/tmp/mja-source.b64','utf8'),'base64'))"
+          echo "82fbec771c569c72017fd55bd038dee248da22277dd7c9d10e349f18f8148ff9  /tmp/mja-source.zip" | shasum -a 256 -c -
+          rm -rf /tmp/mja-src
           mkdir -p /tmp/mja-src
           unzip -q /tmp/mja-source.zip -d /tmp/mja-src
-      - name: Install standalone runtime and packaging tools
-        working-directory: /tmp/mja-src/mja-public-build
+      - name: Install build tooling
+        working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
         run: npm install --no-audit --no-fund
-      - name: Validate application
-        working-directory: /tmp/mja-src/mja-public-build
-        run: npm run check
+      - name: Verify source and unit tests
+        working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
+        run: npm run verify
+      - name: Audit production dependencies
+        working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
+        run: npm audit --omit=dev --audit-level=high
       - name: Build Apple Silicon DMG
-        working-directory: /tmp/mja-src/mja-public-build
+        working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
         run: bash ./build-dmg.sh
+      - name: Validate packaged application and DMG
+        working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
+        run: |
+          set -euo pipefail
+          APP='dist/Michael Job Agent-darwin-arm64/Michael Job Agent.app'
+          DMG='dist/Michael-Job-Agent-1.0.1-arm64.dmg'
+          test -d "$APP"
+          test -f "$APP/Contents/Resources/app.asar"
+          /usr/bin/plutil -lint "$APP/Contents/Info.plist"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP"
+          file "$APP/Contents/MacOS/Michael Job Agent" | grep -q 'arm64'
+          "$APP/Contents/MacOS/Michael Job Agent" > /tmp/mja-smoke.log 2>&1 &
+          PID=$!
+          sleep 5
+          if ! kill -0 "$PID" 2>/dev/null; then
+            cat /tmp/mja-smoke.log
+            wait "$PID" || true
+            echo 'Packaged app exited during smoke test' >&2
+            exit 1
+          fi
+          kill "$PID" || true
+          wait "$PID" || true
+          test -f "$DMG"
+          shasum -a 256 -c "${DMG}.sha256"
+          MOUNT="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DMG" >/dev/null
+          trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rmdir "$MOUNT" >/dev/null 2>&1 || true' EXIT
+          test -d "$MOUNT/Michael Job Agent.app"
+          test -L "$MOUNT/Applications"
+          /usr/bin/codesign --verify --deep --strict "$MOUNT/Michael Job Agent.app"
+          hdiutil detach "$MOUNT" >/dev/null
+          rmdir "$MOUNT"
+          trap - EXIT
       - name: Stage artifact
         run: |
           mkdir -p "$GITHUB_WORKSPACE/out"
-          cp '/tmp/mja-src/mja-public-build/dist/Michael-Job-Agent-1.0.0-arm64.dmg' "$GITHUB_WORKSPACE/out/"
-          cp '/tmp/mja-src/mja-public-build/dist/Michael-Job-Agent-1.0.0-arm64.dmg.sha256' "$GITHUB_WORKSPACE/out/"
-      - name: Upload DMG
+          cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg' "$GITHUB_WORKSPACE/out/"
+          cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg.sha256' "$GITHUB_WORKSPACE/out/"
+          cp '/tmp/mja-source.zip' "$GITHUB_WORKSPACE/out/Michael-Job-Agent-Desktop-Source-v1.0.1.zip"
+      - name: Upload validated build
         uses: actions/upload-artifact@v4
         with:
-          name: Michael-Job-Agent-Mac-arm64
+          name: Michael-Job-Agent-Mac-arm64-v1.0.1
           path: out/*
           if-no-files-found: error
           retention-days: 7
