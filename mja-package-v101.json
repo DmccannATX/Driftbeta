@@ -1,0 +1,21 @@
+{
+  "name": "michael-job-agent",
+  "productName": "Michael Job Agent",
+  "version": "1.0.1",
+  "description": "Standalone macOS job search and application assistant",
+  "private": true,
+  "main": "main.cjs",
+  "author": "David McCann",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "check": "bash -n build-dmg.sh && node --check main.cjs && node --check preload.cjs && node --check lib.cjs && node --check resume.cjs && node --check renderer/app.js && node --check tests.cjs",
+    "test": "node tests.cjs",
+    "verify": "npm run check && npm test",
+    "pack:mac-arm64": "electron-packager . \"Michael Job Agent\" --platform=darwin --arch=arm64 --electron-version=44.2.0 --overwrite --out=dist --prune=true --asar --ignore=^/dist$"
+  },
+  "devDependencies": {
+    "@electron/packager": "18.3.6",
+    "electron": "44.2.0"
+  }
+}

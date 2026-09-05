@@ -20,6 +20,9 @@ jobs:
           rm -rf /tmp/mja-src
           mkdir -p /tmp/mja-src
           unzip -q /tmp/mja-source.zip -d /tmp/mja-src
+          cp mja-build-dmg-v101.sh /tmp/mja-src/michael-job-agent-desktop-v1.0.1/build-dmg.sh
+          cp mja-package-v101.json /tmp/mja-src/michael-job-agent-desktop-v1.0.1/package.json
+          chmod +x /tmp/mja-src/michael-job-agent-desktop-v1.0.1/build-dmg.sh
       - name: Install build tooling
         working-directory: /tmp/mja-src/michael-job-agent-desktop-v1.0.1
         run: npm install --no-audit --no-fund
@@ -67,10 +70,12 @@ jobs:
           trap - EXIT
       - name: Stage artifact
         run: |
+          set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg' "$GITHUB_WORKSPACE/out/"
           cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg.sha256' "$GITHUB_WORKSPACE/out/"
-          cp '/tmp/mja-source.zip' "$GITHUB_WORKSPACE/out/Michael-Job-Agent-Desktop-Source-v1.0.1.zip"
+          cd /tmp/mja-src
+          zip -qr "$GITHUB_WORKSPACE/out/Michael-Job-Agent-Desktop-Source-v1.0.1.zip" michael-job-agent-desktop-v1.0.1 -x '*/node_modules/*' '*/dist/*' '*/dmg-stage/*' '*.DS_Store'
       - name: Upload validated build
         uses: actions/upload-artifact@v4
         with:
