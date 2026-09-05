@@ -1,0 +1,41 @@
+name: Build Michael Job Agent DMG
+on:
+  push:
+    branches:
+      - build/michael-job-agent-dmg
+jobs:
+  build-mac:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct source
+        run: |
+          node -e "const fs=require('fs');fs.writeFileSync('/tmp/mja-source.zip',Buffer.from(fs.readFileSync('mja-public-source.b64','utf8'),'base64'))"
+          echo "2e89d920c437b8b81bf2e04673519f0ad34b6146b52b6ab5c34497bbf9859620  /tmp/mja-source.zip" | shasum -a 256 -c -
+          mkdir -p /tmp/mja-src
+          unzip -q /tmp/mja-source.zip -d /tmp/mja-src
+      - name: Install standalone runtime and packaging tools
+        working-directory: /tmp/mja-src/mja-public-build
+        run: npm install --no-audit --no-fund
+      - name: Validate application
+        working-directory: /tmp/mja-src/mja-public-build
+        run: npm run check
+      - name: Build Apple Silicon DMG
+        working-directory: /tmp/mja-src/mja-public-build
+        run: bash ./build-dmg.sh
+      - name: Stage artifact
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp '/tmp/mja-src/mja-public-build/dist/Michael-Job-Agent-1.0.0-arm64.dmg' "$GITHUB_WORKSPACE/out/"
+          cp '/tmp/mja-src/mja-public-build/dist/Michael-Job-Agent-1.0.0-arm64.dmg.sha256' "$GITHUB_WORKSPACE/out/"
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Michael-Job-Agent-Mac-arm64
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
