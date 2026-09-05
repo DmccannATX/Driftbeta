@@ -74,8 +74,9 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg' "$GITHUB_WORKSPACE/out/"
           cp '/tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist/Michael-Job-Agent-1.0.1-arm64.dmg.sha256' "$GITHUB_WORKSPACE/out/"
+          rm -rf /tmp/mja-src/michael-job-agent-desktop-v1.0.1/node_modules /tmp/mja-src/michael-job-agent-desktop-v1.0.1/dist /tmp/mja-src/michael-job-agent-desktop-v1.0.1/dmg-stage
           cd /tmp/mja-src
-          zip -qr "$GITHUB_WORKSPACE/out/Michael-Job-Agent-Desktop-Source-v1.0.1.zip" michael-job-agent-desktop-v1.0.1 -x '*/node_modules/*' '*/dist/*' '*/dmg-stage/*' '*.DS_Store'
+          zip -qry "$GITHUB_WORKSPACE/out/Michael-Job-Agent-Desktop-Source-v1.0.1.zip" michael-job-agent-desktop-v1.0.1
       - name: Upload validated build
         uses: actions/upload-artifact@v4
         with:
