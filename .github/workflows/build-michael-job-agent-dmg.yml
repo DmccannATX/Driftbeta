@@ -2,6 +2,7 @@ name: Build Michael Job Agent DMG
 on:
   push:
     branches:
+      - main
       - build/michael-job-agent-dmg
 jobs:
   build-mac:
